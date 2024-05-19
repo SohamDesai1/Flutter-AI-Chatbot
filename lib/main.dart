@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:sizer/sizer.dart';
-import 'dart:developer';
-
-import 'package:tex_markdown/tex_markdown.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 void main() async {
   await dotenv.load(fileName: '.env');
-  runApp(const MainApp());
+  runApp(const MaterialApp(debugShowCheckedModeBanner: false, home: MainApp()));
 }
 
 class MainApp extends StatefulWidget {
@@ -20,15 +18,42 @@ class MainApp extends StatefulWidget {
 
 class _MainAppState extends State<MainApp> {
   late final _prompt = TextEditingController();
+  late final _scroll = ScrollController();
+  final focus = FocusNode();
   late final GenerativeModel _model;
   late final ChatSession _chat;
   bool _loading = false;
+  String value = "gemini-1.5-flash-latest";
+
+  List<DropdownMenuItem<String>> dropDownMenu = [
+    const DropdownMenuItem(
+      value: "gemini-1.5-flash-latest",
+      child: Text("Google Gemini 1.5 Flash"),
+    ),
+    const DropdownMenuItem(
+      value: "gemini-1.5-pro-latest",
+      child: Text("Google Gemini 1.5 Pro"),
+    ),
+  ];
+
   @override
   void initState() {
     super.initState();
     var apiKey = dotenv.env['GEMINI_API'];
-    _model = GenerativeModel(model: "gemini-1.5-flash-latest", apiKey: apiKey!);
+    _model = GenerativeModel(model: value, apiKey: apiKey!);
     _chat = _model.startChat();
+  }
+
+  void _scrollDown() {
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _scroll.animateTo(
+        _scroll.position.maxScrollExtent,
+        duration: const Duration(
+          milliseconds: 1000,
+        ),
+        curve: Curves.easeOutCirc,
+      ),
+    );
   }
 
   Future getAnswer(String prompt) async {
@@ -58,6 +83,7 @@ class _MainAppState extends State<MainApp> {
       } else {
         setState(() {
           _loading = false;
+          _scrollDown();
         });
       }
     } catch (e) {
@@ -83,105 +109,136 @@ class _MainAppState extends State<MainApp> {
         _loading = false;
       });
     }
-    // print(responses.map((e) => e.parts));
-    // final endTime = DateTime.now();
-    // setState(() {
-    //   text = response.text!;
-    //   responseTime = endTime.difference(startTime);
-    // });
-    // log(responseTime.inSeconds.toString());
   }
 
   @override
   Widget build(BuildContext context) {
     return Sizer(
       builder: (context, orientation, deviceType) {
-        return MaterialApp(
-          debugShowCheckedModeBanner: false,
-          home: Scaffold(
-            body: SafeArea(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    Stack(
-                      children: [
-                        Opacity(
-                          opacity: 0.85,
-                          child: Image.asset(
-                            "assets/images/iimg.jpg",
-                            fit: BoxFit.cover,
-                            width: 100.w,
-                            height: 84.95.h,
-                          ),
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            actions: [
+              const Text(
+                "Select Model:",
+                style: TextStyle(color: Colors.white, fontSize: 20),
+              ),
+              SizedBox(
+                width: 3.w,
+              ),
+              Container(
+                decoration: BoxDecoration(
+                    border: Border.all(color: Colors.white),
+                    borderRadius: BorderRadius.circular(20)),
+                child: DropdownButton(
+                    hint: const Text(
+                      "Select model",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    value: value,
+                    icon: const Icon(
+                      Icons.arrow_drop_down,
+                      color: Colors.white,
+                    ),
+                    iconSize: 30,
+                    elevation: 16,
+                    style: const TextStyle(fontSize: 20, color: Colors.white),
+                    dropdownColor: Colors.black,
+                    underline: const SizedBox(),
+                    onChanged: (newValue) {
+                      setState(() {
+                        value = newValue!;
+                      });
+                    },
+                    items: dropDownMenu),
+              ),
+            ],
+          ),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  Stack(
+                    children: [
+                      Opacity(
+                        opacity: 0.85,
+                        child: Image.asset(
+                          "assets/images/iimg.jpg",
+                          fit: BoxFit.cover,
+                          width: 100.w,
+                          height: 80.h,
                         ),
-                        Positioned.fill(
-                          child: Column(
-                            children: [
-                              SizedBox(
-                                height: 83.h,
-                                child: ListView.builder(
-                                  itemBuilder: (context, index) {
-                                    final responses =
-                                        _chat.history.toList()[index];
-                                    var text = responses.parts
-                                        .whereType<TextPart>()
-                                        .map<String>((e) => e.text)
-                                        .join('');
-                                    return chatBubble(
-                                        text, responses.role.toString());
-                                  },
-                                  itemCount: _chat.history.length,
+                      ),
+                      Positioned.fill(
+                        child: Column(
+                          children: [
+                            SizedBox(
+                              height: 80.h,
+                              child: ListView.builder(
+                                controller: _scroll,
+                                itemBuilder: (context, index) {
+                                  final responses =
+                                      _chat.history.toList()[index];
+                                  var text = responses.parts
+                                      .whereType<TextPart>()
+                                      .map<String>((e) => e.text)
+                                      .join('');
+                                  return chatBubble(
+                                      text, responses.role.toString());
+                                },
+                                itemCount: _chat.history.length,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    height: 10.h,
+                    color: Colors.black,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        SizedBox(
+                          width: 80.w,
+                          child: TextField(
+                            style: const TextStyle(color: Colors.white),
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(20),
                                 ),
                               ),
-                            ],
+                              hintText: "Input your prompt...",
+                              hintStyle: TextStyle(color: Colors.white),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(20),
+                                ),
+                                borderSide: BorderSide(color: Colors.white),
+                              ),
+                            ),
+                            controller: _prompt,
+                            focusNode: focus,
                           ),
                         ),
+                        !_loading
+                            ? IconButton(
+                                onPressed: () async {
+                                  FocusManager.instance.primaryFocus?.unfocus();
+                                  getAnswer(_prompt.text);
+                                },
+                                icon: const Icon(
+                                    Icons.arrow_circle_right_rounded),
+                                color: Colors.blueAccent,
+                                iconSize: 6.h,
+                              )
+                            : const CircularProgressIndicator(),
                       ],
                     ),
-                    Container(
-                      height: 10.h,
-                      color: Colors.black,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          SizedBox(
-                            width: 80.w,
-                            child: TextField(
-                              style: const TextStyle(color: Colors.white),
-                              decoration: const InputDecoration(
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(
-                                    Radius.circular(20),
-                                  ),
-                                ),
-                                hintText: "Input your prompt...",
-                                hintStyle: TextStyle(color: Colors.white),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(
-                                    Radius.circular(20),
-                                  ),
-                                  borderSide: BorderSide(color: Colors.white),
-                                ),
-                              ),
-                              controller: _prompt,
-                            ),
-                          ),
-                          !_loading
-                              ? IconButton(
-                                  onPressed: () async {
-                                    getAnswer(_prompt.text);
-                                  },
-                                  icon: const Icon(
-                                      Icons.arrow_circle_right_rounded),
-                                  color: Colors.blueAccent,
-                                  iconSize: 6.h,
-                                )
-                              : const CircularProgressIndicator(),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -207,8 +264,8 @@ class _MainAppState extends State<MainApp> {
           bottomLeft: const Radius.circular(16.0),
         ),
       ),
-      child: TexMarkdown(
-        message,
+      child: MarkdownBody(
+        data: message,
       ),
     );
   }

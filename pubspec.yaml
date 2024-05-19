@@ -15,7 +15,6 @@ dependencies:
   google_generative_ai: ^0.4.0
   http: ^1.2.1
   sizer: ^2.0.15
-  tex_markdown: ^0.1.10
 
 dev_dependencies:
   flutter_lints: ^3.0.0
