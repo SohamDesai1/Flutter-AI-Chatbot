@@ -1,29 +1,34 @@
+import 'package:ai_chatbot/providers/model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:io';
 import 'package:sizer/sizer.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'providers/chat.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:image_picker/image_picker.dart';
 
 void main() async {
   await dotenv.load(fileName: '.env');
-  runApp(const MaterialApp(debugShowCheckedModeBanner: false, home: MainApp()));
+  runApp(const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: ProviderScope(child: MainApp())));
 }
 
-class MainApp extends StatefulWidget {
+class MainApp extends ConsumerStatefulWidget {
   const MainApp({super.key});
 
   @override
-  State<MainApp> createState() => _MainAppState();
+  ConsumerState<ConsumerStatefulWidget> createState() => _MainAppState();
 }
 
-class _MainAppState extends State<MainApp> {
+class _MainAppState extends ConsumerState<MainApp> {
   late final _prompt = TextEditingController();
-  late final _scroll = ScrollController();
   final focus = FocusNode();
-  late final GenerativeModel _model;
-  late final ChatSession _chat;
-  bool _loading = false;
   String value = "gemini-1.5-flash-latest";
+  final ImagePicker _picker = ImagePicker();
+  XFile? _image;
 
   List<DropdownMenuItem<String>> dropDownMenu = [
     const DropdownMenuItem(
@@ -36,83 +41,60 @@ class _MainAppState extends State<MainApp> {
     ),
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    var apiKey = dotenv.env['GEMINI_API'];
-    _model = GenerativeModel(model: value, apiKey: apiKey!);
-    _chat = _model.startChat();
-  }
+  handleImgUpload() {
+    showDialog(
+      context: context,
+      builder: (context) => Center(
+        child: Container(
+          height: 13.h,
+          color: Colors.white,
+          child: Padding(
+            padding: EdgeInsets.only(top: 2.h),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton(
+                    onPressed: () async {
+                      final XFile? image = await _picker.pickImage(
+                          source: ImageSource.gallery,
+                          imageQuality: 50,
+                          maxWidth: 800,
+                          maxHeight: 600);
 
-  void _scrollDown() {
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _scroll.animateTo(
-        _scroll.position.maxScrollExtent,
-        duration: const Duration(
-          milliseconds: 1000,
+                      setState(() {
+                        _image = image;
+                      });
+                      // ignore: use_build_context_synchronously
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text("Upload from Gallery")),
+                TextButton(
+                    onPressed: () async {
+                      final XFile? image = await _picker.pickImage(
+                          source: ImageSource.camera,
+                          imageQuality: 50,
+                          maxWidth: 800,
+                          maxHeight: 600);
+
+                      setState(() {
+                        _image = image;
+                      });
+                      // ignore: use_build_context_synchronously
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text("Upload from Camera")),
+              ],
+            ),
+          ),
         ),
-        curve: Curves.easeOutCirc,
       ),
     );
   }
 
-  Future getAnswer(String prompt) async {
-    setState(() {
-      _loading = true;
-    });
-    try {
-      final content = Content.text(prompt);
-      final response = await _chat.sendMessage(content);
-      var text = response.text;
-
-      if (text == null && mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => const AlertDialog(
-            title: Text(
-              "Error",
-              style: TextStyle(color: Colors.red),
-            ),
-            content: SizedBox(
-              child: Center(
-                child: Text("Error occured\nPlease try again later."),
-              ),
-            ),
-          ),
-        );
-      } else {
-        setState(() {
-          _loading = false;
-          _scrollDown();
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text(
-              "Error",
-              style: TextStyle(color: Colors.red),
-            ),
-            content: SizedBox(
-              child: Center(
-                child: Text("$e\n Please try again later."),
-              ),
-            ),
-          ),
-        );
-      }
-    } finally {
-      _prompt.clear();
-      setState(() {
-        _loading = false;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final chat = ref.watch(chatProvider);
+    final modelSelect = ref.read(modelSelectorProvider.notifier);
     return Sizer(
       builder: (context, orientation, deviceType) {
         return Scaffold(
@@ -146,9 +128,7 @@ class _MainAppState extends State<MainApp> {
                     dropdownColor: Colors.black,
                     underline: const SizedBox(),
                     onChanged: (newValue) {
-                      setState(() {
-                        value = newValue!;
-                      });
+                      modelSelect.setModel(newValue!);
                     },
                     items: dropDownMenu),
               ),
@@ -175,10 +155,10 @@ class _MainAppState extends State<MainApp> {
                             SizedBox(
                               height: 80.h,
                               child: ListView.builder(
-                                controller: _scroll,
+                                controller: chat.scroll,
                                 itemBuilder: (context, index) {
                                   final responses =
-                                      _chat.history.toList()[index];
+                                      chat.chatSession.history.toList()[index];
                                   var text = responses.parts
                                       .whereType<TextPart>()
                                       .map<String>((e) => e.text)
@@ -186,7 +166,7 @@ class _MainAppState extends State<MainApp> {
                                   return chatBubble(
                                       text, responses.role.toString());
                                 },
-                                itemCount: _chat.history.length,
+                                itemCount: chat.chatSession.history.length,
                               ),
                             ),
                           ],
@@ -203,31 +183,53 @@ class _MainAppState extends State<MainApp> {
                         SizedBox(
                           width: 80.w,
                           child: TextField(
+                            maxLines: null,
                             style: const TextStyle(color: Colors.white),
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(
+                            decoration: InputDecoration(
+                              border: const OutlineInputBorder(
                                 borderRadius: BorderRadius.all(
                                   Radius.circular(20),
                                 ),
                               ),
                               hintText: "Input your prompt...",
-                              hintStyle: TextStyle(color: Colors.white),
-                              enabledBorder: OutlineInputBorder(
+                              hintStyle: const TextStyle(color: Colors.white),
+                              enabledBorder: const OutlineInputBorder(
                                 borderRadius: BorderRadius.all(
                                   Radius.circular(20),
                                 ),
                                 borderSide: BorderSide(color: Colors.white),
+                              ),
+                              prefixIcon: _image != null
+                                  ? Container(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Image.file(
+                                        File(_image!.path),
+                                        width: 10.w,
+                                        height: 15.h,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    )
+                                  : const SizedBox(
+                                      width: 0,
+                                      height: 0,
+                                    ),
+                              suffixIcon: IconButton(
+                                onPressed: handleImgUpload,
+                                icon: const Icon(
+                                  Icons.upload_file,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                             controller: _prompt,
                             focusNode: focus,
                           ),
                         ),
-                        !_loading
+                        !chat.loading
                             ? IconButton(
                                 onPressed: () async {
                                   FocusManager.instance.primaryFocus?.unfocus();
-                                  getAnswer(_prompt.text);
+                                  chat.getAnswer(_prompt.text, context);
                                 },
                                 icon: const Icon(
                                     Icons.arrow_circle_right_rounded),
