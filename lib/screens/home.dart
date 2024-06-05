@@ -1,11 +1,11 @@
 import 'package:ai_chatbot/providers/model.dart';
+import 'package:ai_chatbot/widgets/chat_bubble.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:sizer/sizer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../providers/chat.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:image_picker/image_picker.dart';
 
 class Home extends ConsumerStatefulWidget {
@@ -18,7 +18,6 @@ class Home extends ConsumerStatefulWidget {
 class _HomeState extends ConsumerState<Home> {
   late final _prompt = TextEditingController();
   final focus = FocusNode();
-  // String value = "gemini-1.5-flash-latest";
   final ImagePicker _picker = ImagePicker();
   XFile? _image;
 
@@ -157,8 +156,11 @@ class _HomeState extends ConsumerState<Home> {
                                       .whereType<TextPart>()
                                       .map<String>((e) => e.text)
                                       .join('');
-                                  return chatBubble(
-                                      text, responses.role.toString());
+                                  return ChatBubble(
+                                    message: text,
+                                    isUser: responses.role.toString(),
+                                    image: _image?.path,
+                                  );
                                 },
                                 itemCount: chat.chatSession.history.length,
                               ),
@@ -226,8 +228,10 @@ class _HomeState extends ConsumerState<Home> {
                                   if (_image != null) {
                                     await chat.getImgAns(
                                         _image!.path, _prompt.text, context);
+                                    _prompt.clear();
                                   } else {
                                     await chat.getAnswer(_prompt.text, context);
+                                    _prompt.clear();
                                   }
                                 },
                                 icon: const Icon(
@@ -245,29 +249,6 @@ class _HomeState extends ConsumerState<Home> {
           ),
         );
       },
-    );
-  }
-
-  Widget chatBubble(String message, String isUser) {
-    return Container(
-      margin: EdgeInsets.only(
-          top: 10.0,
-          bottom: 10.0,
-          left: isUser == "user" ? 12.w : 1.h,
-          right: isUser == "user" ? 1.h : 12.w),
-      padding: EdgeInsets.all(2.h),
-      decoration: BoxDecoration(
-        color: isUser == "user" ? Colors.blue[200] : Colors.grey[200],
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(isUser == "user" ? 16.0 : 0.0),
-          topRight: Radius.circular(isUser == "user" ? 0.0 : 16.0),
-          bottomRight: const Radius.circular(16.0),
-          bottomLeft: const Radius.circular(16.0),
-        ),
-      ),
-      child: MarkdownBody(
-        data: message,
-      ),
     );
   }
 }
