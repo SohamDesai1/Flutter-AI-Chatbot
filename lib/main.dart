@@ -26,7 +26,7 @@ class MainApp extends ConsumerStatefulWidget {
 class _MainAppState extends ConsumerState<MainApp> {
   late final _prompt = TextEditingController();
   final focus = FocusNode();
-  String value = "gemini-1.5-flash-latest";
+  // String value = "gemini-1.5-flash-latest";
   final ImagePicker _picker = ImagePicker();
   XFile? _image;
 
@@ -95,6 +95,8 @@ class _MainAppState extends ConsumerState<MainApp> {
   Widget build(BuildContext context) {
     final chat = ref.watch(chatProvider);
     final modelSelect = ref.read(modelSelectorProvider.notifier);
+    final model = ref.watch(modelSelectorProvider);
+
     return Sizer(
       builder: (context, orientation, deviceType) {
         return Scaffold(
@@ -117,7 +119,7 @@ class _MainAppState extends ConsumerState<MainApp> {
                       "Select model",
                       style: TextStyle(color: Colors.white),
                     ),
-                    value: value,
+                    value: model,
                     icon: const Icon(
                       Icons.arrow_drop_down,
                       color: Colors.white,
