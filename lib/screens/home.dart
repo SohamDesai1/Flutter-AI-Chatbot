@@ -223,7 +223,12 @@ class _HomeState extends ConsumerState<Home> {
                             ? IconButton(
                                 onPressed: () async {
                                   FocusManager.instance.primaryFocus?.unfocus();
-                                  chat.getAnswer(_prompt.text, context);
+                                  if (_image != null) {
+                                    await chat.getImgAns(
+                                        _image!.path, _prompt.text, context);
+                                  } else {
+                                    await chat.getAnswer(_prompt.text, context);
+                                  }
                                 },
                                 icon: const Icon(
                                     Icons.arrow_circle_right_rounded),

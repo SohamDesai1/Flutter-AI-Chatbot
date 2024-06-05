@@ -77,6 +77,59 @@ class ChatNotifier extends ChangeNotifier {
     }
   }
 
+  Future getImgAns(
+      String filepath, String question, BuildContext context) async {
+    _loading = true;
+    notifyListeners();
+    try {
+      final img = await File(filepath).readAsBytes();
+      final prompt = TextPart(question);
+      final imagePart = DataPart('image/png', img);
+      final response =
+          await _chatSession.sendMessage(Content.multi([prompt, imagePart]));
+      var text = response.text;
+      if (text == null) {
+        showDialog(
+          // ignore: use_build_context_synchronously
+          context: context,
+          builder: (context) => const AlertDialog(
+            title: Text(
+              "Error",
+              style: TextStyle(color: Colors.red),
+            ),
+            content: SizedBox(
+              child: Center(
+                child: Text("Please try again later."),
+              ),
+            ),
+          ),
+        );
+      } else {
+        _responseText = text;
+        _scrollDown();
+      }
+    } catch (e) {
+      showDialog(
+        // ignore: use_build_context_synchronously
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text(
+            "Error",
+            style: TextStyle(color: Colors.red),
+          ),
+          content: SizedBox(
+            child: Center(
+              child: Text("$e\n Please try again later."),
+            ),
+          ),
+        ),
+      );
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
   void _scrollDown() {
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => scroll.animateTo(
@@ -87,19 +140,5 @@ class ChatNotifier extends ChangeNotifier {
         curve: Curves.easeOutCirc,
       ),
     );
-  }
-
-  Future getImgAns(String filepath) async {
-    var apiKey = dotenv.env['GEMINI_API'];
-    final model =
-        GenerativeModel(model: 'gemini-1.5-flash-latest', apiKey: apiKey!);
-    final img = await File(filepath).readAsBytes();
-    final prompt = TextPart("What is the image?");
-    final imagePart = DataPart('image/png', img);
-    final response = await model.generateContent([
-      Content.multi([prompt, imagePart])
-    ]);
-    notifyListeners();
-    return response;
   }
 }
