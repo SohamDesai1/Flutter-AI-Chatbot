@@ -139,7 +139,7 @@ class _HomeState extends ConsumerState<Home> {
                           "assets/images/iimg.jpg",
                           fit: BoxFit.cover,
                           width: 100.w,
-                          height: 80.h,
+                          height: 83.5.h,
                         ),
                       ),
                       Positioned.fill(
