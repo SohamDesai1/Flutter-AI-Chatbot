@@ -1,5 +1,6 @@
 import 'dart:developer';
 
+import 'package:ai_chatbot/widgets/drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:langchain/langchain.dart';
@@ -49,6 +50,7 @@ class _ChatPDFState extends ConsumerState<ChatPDF> {
       appBar: AppBar(
         backgroundColor: Colors.black,
       ),
+      drawer: const AppDrawer(),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
